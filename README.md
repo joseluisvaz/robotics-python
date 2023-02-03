@@ -1,2 +1,2 @@
-# master-thesis
-Experiments for master thesis and notes.
+# Robotics Python
+Robotics experiments in Python
