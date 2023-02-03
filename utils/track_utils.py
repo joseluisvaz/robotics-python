@@ -45,6 +45,15 @@ def centerline_to_polygon(
     Returns:
        polygon: Numpy array of shape (2N+1,2), with duplicate first and last vertices.
     """
+
+    left_centerline, right_centerline = calc_boundaries_from_centerline(centerline, width_scaling_factor, visualize)
+    return convert_lane_boundaries_to_polygon(right_centerline, left_centerline)
+
+def calc_boundaries_from_centerline(
+    centerline: np.ndarray, width_scaling_factor: float = 1.0, visualize: bool = False
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Calculate boundaries from centerline, see centerline_to_polygon() for details"""
+
     # eliminate duplicates
     _, inds = np.unique(centerline, axis=0, return_index=True)
     # does not return indices in sorted order
@@ -78,9 +87,7 @@ def centerline_to_polygon(
     # right centerline also depended on if we added or subtracted y
     neg_disp_cond = displacement[:, 1] > 0
     left_centerline, right_centerline = swap_left_and_right(neg_disp_cond, left_centerline, right_centerline)
-
-    # return the polygon
-    return convert_lane_boundaries_to_polygon(right_centerline, left_centerline)
+    return left_centerline, right_centerline
 
 
 def convert_lane_boundaries_to_polygon(right_lane_bounds: np.ndarray, left_lane_bounds: np.ndarray) -> np.ndarray:
