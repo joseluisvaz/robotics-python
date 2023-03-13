@@ -1,9 +1,23 @@
-import numpy as np
+import typing as T
 from functools import partial
 
+import numpy as np
 import jax.numpy as jnp
 from jax import jit, jacfwd
 
+
+Array = T.Union[jnp.ndarray, np.ndarray]
+
+def euler(f: T.Callable, state: Array, h: float) -> Array:
+    return state +  h * f(state)
+
+def runge_kutta(f: T.Callable, state: Array, h: float) -> Array:
+    k1 = f(state)
+    k2 = f(state + h/2 * k1)        
+    k3 = f(state + h/2 * k2)
+    k4 = f(state + h * k3)
+    state = state + h/6 * (k1 + 2*k2 + 2*k3 + k4)
+    return state 
 
 class BicycleModel(object):
     def __init__(self):
@@ -31,7 +45,7 @@ class BicycleModel(object):
         self.get_A_matrix = jit(jacfwd(self.__call__, argnums=0))
         self.get_B_matrix = jit(jacfwd(self.__call__, argnums=1))
 
-    def get_physical_inputs(self, u):
+    def get_physical_inputs(self, u: Array) -> Array:
         scale = np.array([self.a_scale_mpss, self.steering_scale_rad])
         return scale * jnp.tanh(u)
 
@@ -59,21 +73,22 @@ class BicycleModel(object):
         x_ = np.array([-dr, df, df, -dr, -dr, df, dr])
         y_ = np.array([w, w, -w, -w, w, 0.0, -w])
         return x_, y_
-
+        
     @partial(jit, static_argnums=(0,))
-    def __call__(self, state, input):
+    def __call__(self, state: Array, input: Array) -> Array:
         input = self.get_physical_inputs(input)
         a, steering = input[0], input[1]
 
-        x, y, theta, v = state
-
-        x = x + self.dt * (v * jnp.cos(theta))
-        y = y + self.dt * (v * jnp.sin(theta))
-        theta = theta + self.dt * (v / (self.lf + self.lr) * jnp.tan(steering))
-        v = v + self.dt * a
-
-        return jnp.array([x, y, theta, v])
-
+        def f(state):
+            _, _, theta, v = state 
+            return jnp.array([
+                     v * jnp.cos(theta),
+                     v * jnp.sin(theta),
+                     v / (self.lf + self.lr) * jnp.tan(steering),
+                     a
+            ])
+             
+        return runge_kutta(f, state, self.dt)
 
 class BicycleModelWithInputIntegrators(BicycleModel):
     def __init__(self):
@@ -108,17 +123,21 @@ class BicycleModelWithInputIntegrators(BicycleModel):
     def __call__(self, state, input, params):
         input = self.get_physical_inputs(input)
         jerk, dsteering = input[0], input[1]
+        
 
-        x, y, theta, v, a, steering = state
-
-        x = x + self.dt * (v * jnp.cos(theta))
-        y = y + self.dt * (v * jnp.sin(theta))
-        theta = theta + self.dt * (v / (self.lf + self.lr) * jnp.tan(steering))
-        v = v + self.dt * a
-        a = a + self.dt * jerk
-        steering = steering + self.dt * dsteering
-
-        return jnp.array([x, y, theta, v, a, steering])
+        def f(state):
+            _, _, theta, v, a, steering = state
+            
+            return jnp.array([
+                     v * jnp.cos(theta),
+                     v * jnp.sin(theta),
+                     v / (self.lf + self.lr) * jnp.tan(steering),
+                     a,
+                     jerk,
+                     dsteering,
+            ])
+        
+        return runge_kutta(f, state, self.dt)
 
 class CurvilinearBicycleModelWithInputIntegrators(BicycleModel):
     def __init__(self):

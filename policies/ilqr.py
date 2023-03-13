@@ -278,7 +278,7 @@ def visualize_optimization(starting_state, policy, dynamics, make_gif=False):
         (policy.config.horizon, policy.dynamics.udim)
     )
     x_solution, u_solution = policy.solve(
-        starting_state, warmstart=warmstart, callback=callback_fn
+        starting_state, warmstart=warmstart, callback=callback_fn, debug=True
     )
 
     u_solution_physical = dynamics.get_physical_inputs(u_solution)
@@ -324,7 +324,7 @@ def visualize_benchmark(policy):
 
     policy.dynamics.plot(xy_axis, policy.cost_function.goal, c="r", alpha=1.0)
     for x_0, c in zip(initial_states, colors):
-        x_solution, _ = policy.solve(x_0)
+        x_solution, _ = policy.solve(x_0, debug=True)
         plot_trajectory(xy_axis, policy.dynamics, x_solution, c=c, alpha=1.0)
     xy_axis.axis("equal")
     plt.show()
